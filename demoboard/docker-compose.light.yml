@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  api-service:
+    build: ./api-service
+    environment:
+      DB_BACKEND: sqlite
+      SQLITE_PATH: /data/tasks.db
+      ENABLE_WORKER: "false"
+    volumes:
+      - api-data:/data
+    ports:
+      - "8000:8000"
+
+  frontend-service:
+    build:
+      context: ./frontend-service
+      args:
+        VITE_API_URL: /api
+        VITE_ENABLE_WORKER: "false"
+    depends_on:
+      - api-service
+    ports:
+      - "8080:80"
+
+volumes:
+  api-data:
