@@ -112,3 +112,7 @@ Variables de configuration :
 - Injecter la configuration (variables `DB_*`, `REDIS_*`, `VITE_API_URL`) via ConfigMap/Secret.
 
 Le dossier `kubernetes/` du dépôt pourra accueillir ces manifests pour aller plus loin en TP.
+
+## Changelog
+
+- 2026-03-11 : Frontend mis à jour pour un build propre (npm 11.11.0 dans l'image, passage à `vite` 7.3.1 et `@vitejs/plugin-vue` 6.0.4, ajout de `package-lock.json`, installation via `npm ci`) avec suppression de l'alerte de version npm et audit npm sans vulnérabilité.
