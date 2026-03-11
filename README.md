@@ -116,3 +116,4 @@ Le dossier `kubernetes/` du dépôt pourra accueillir ces manifests pour aller p
 ## Changelog
 
 - 2026-03-11 : Frontend mis à jour pour un build propre (npm 11.11.0 dans l'image, passage à `vite` 7.3.1 et `@vitejs/plugin-vue` 6.0.4, ajout de `package-lock.json`, installation via `npm ci`) avec suppression de l'alerte de version npm et audit npm sans vulnérabilité.
+- 2026-03-11 : Builds Python (`api-service` et `worker-service`) nettoyés en supprimant les warnings pip liés à l'exécution en root via configuration `PIP_ROOT_USER_ACTION=ignore` et `PIP_DISABLE_PIP_VERSION_CHECK=1`.
