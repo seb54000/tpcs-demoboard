@@ -13,7 +13,7 @@ ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_ENABLE_WORKER=${VITE_ENABLE_WORKER}
 
 COPY . .
-RUN npm run build
+RUN npm run build -- --outDir dist
 
 FROM nginx:1.25-alpine
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
