@@ -3,8 +3,11 @@ import os
 import time
 
 import redis
+from opentelemetry.propagate import extract
+from opentelemetry.trace import SpanKind
 
 from db import get_db, init_db
+from telemetry import job_counter, job_duration, logger, tracer
 
 
 def _parse_port(value: str | None, default: int) -> int:
@@ -29,7 +32,7 @@ PROCESSING_TIME = int(os.getenv("WORKER_PROCESSING_TIME", "5"))
 def main() -> None:
     init_db()
     queue = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
-    print("Worker started, waiting for jobs...")
+    logger.info("Worker started and waiting for jobs")
 
     while True:
         _, message = queue.blpop(QUEUE_NAME)
@@ -38,14 +41,29 @@ def main() -> None:
         if task_id is None:
             continue
 
-        print(f"Processing task {task_id}")
-        time.sleep(PROCESSING_TIME)
+        parent_context = extract(job.get("_trace", {}))
+        start = time.perf_counter()
+        with tracer.start_as_current_span(
+            "worker.process_job",
+            context=parent_context,
+            kind=SpanKind.CONSUMER,
+        ) as span:
+            span.set_attribute("messaging.system", "redis")
+            span.set_attribute("messaging.destination.name", QUEUE_NAME)
+            span.set_attribute("task.id", task_id)
+            logger.info("Processing task %s", task_id)
+            time.sleep(PROCESSING_TIME)
 
-        with get_db() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("UPDATE tasks SET status='completed' WHERE id=%s", (task_id,))
+            with tracer.start_as_current_span("worker.complete_task") as db_span:
+                db_span.set_attribute("task.id", task_id)
+                with get_db() as conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("UPDATE tasks SET status='completed' WHERE id=%s", (task_id,))
 
-        print(f"Task {task_id} completed")
+            duration_ms = (time.perf_counter() - start) * 1000
+            job_counter.add(1, {"queue.name": QUEUE_NAME})
+            job_duration.record(duration_ms, {"queue.name": QUEUE_NAME})
+            logger.info("Task %s completed", task_id)
 
 
 if __name__ == "__main__":

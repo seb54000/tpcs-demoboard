@@ -7,8 +7,17 @@ services:
       DB_BACKEND: sqlite
       SQLITE_PATH: /data/tasks.db
       ENABLE_WORKER: "false"
+      OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_SERVICE_NAME: demoboard-api
+      OTEL_ENVIRONMENT: ${OTEL_ENVIRONMENT:-docker-compose-light}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      APP_LOG_FILE: /var/log/demoboard/api-service.log
     volumes:
       - api-data:/data
+      - ./observability-logs/api:/var/log/demoboard
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
 
@@ -22,6 +31,8 @@ services:
       - api-service
     ports:
       - "8080:80"
+    volumes:
+      - ./observability-logs/frontend:/var/log/nginx
 
 volumes:
   api-data:

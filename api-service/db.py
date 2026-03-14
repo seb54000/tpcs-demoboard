@@ -1,12 +1,16 @@
 import os
 import sqlite3
 import time
+import logging
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Protocol, Union
 
 import psycopg2
 from psycopg2.extensions import connection as pg_connection
+
+
+logger = logging.getLogger("demoboard-api")
 
 
 class SupportsCursor(Protocol):
@@ -56,8 +60,11 @@ def _create_postgres_connection() -> pg_connection:
             )
         except psycopg2.OperationalError as exc:
             last_exc = exc
-            print(
-                f"[api-service] Database unavailable (attempt {attempt}/{DB_MAX_RETRIES}): {exc}"
+            logger.warning(
+                "Database unavailable (attempt %s/%s): %s",
+                attempt,
+                DB_MAX_RETRIES,
+                exc,
             )
             time.sleep(DB_RETRY_DELAY)
     raise RuntimeError("Could not connect to database") from last_exc

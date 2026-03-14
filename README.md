@@ -74,6 +74,21 @@ Variables de configuration :
 | `DB_HOST/PORT/...`  | Paramètres PostgreSQL                               |
 | `ENABLE_WORKER`     | Active/désactive l'endpoint `/start-job` côté API   |
 | `VITE_ENABLE_WORKER`| Affiche/masque le bouton "Traitement long" côté UI  |
+| `OTEL_ENABLED`      | Active l'export OTLP des traces et métriques        |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP HTTP du collector           |
+| `APP_LOG_FILE`      | Fichier de logs JSON corrélés à OpenTelemetry       |
+
+## Observabilité
+
+Le dépôt est prêt pour un stack OTEL externe :
+
+- **API** : traces OTEL sur chaque requête, spans métier (`tasks.create`, `tasks.start_job`, etc.), métriques d'API, logs JSON avec `trace_id`/`span_id`.
+- **Worker** : traces OTEL sur la consommation Redis, propagation de contexte depuis l'API vers le worker, métriques de traitement, logs JSON corrélés.
+- **Frontend** : logs JSON Nginx collectables dans la même chaîne de logs. Pour des traces navigateur OTEL, il faudra ajouter une instrumentation web dédiée côté Vue.
+- **PostgreSQL / Redis** : on **ne modifie pas** les images officielles ; on collecte leurs métriques via des exporters dédiés (`postgres-exporter`, `redis-exporter`) dans le dépôt monitoring.
+- **Logs applicatifs** : écrits sur stdout et dans `./observability-logs/` pour être collectés par Fluent Bit ou un autre agent.
+
+En Docker Compose, la configuration par défaut cible un collector OTLP sur `http://host.docker.internal:4318`. Si le stack monitoring n'est pas lancé, mettez `OTEL_ENABLED=false`.
 
 ## Développement local sans Compose
 

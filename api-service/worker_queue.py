@@ -3,6 +3,9 @@ import os
 from typing import Any, Dict
 
 import redis
+from opentelemetry.propagate import inject
+
+from telemetry import tracer
 
 
 def _parse_port(value: str | None, default: int) -> int:
@@ -29,4 +32,11 @@ def _get_client() -> redis.Redis:
 
 def publish_job(payload: Dict[str, Any]) -> None:
     client = _get_client()
-    client.rpush(QUEUE_NAME, json.dumps(payload))
+    carrier: Dict[str, str] = {}
+    inject(carrier)
+    message = dict(payload)
+    message["_trace"] = carrier
+    with tracer.start_as_current_span("redis.publish_job") as span:
+        span.set_attribute("messaging.system", "redis")
+        span.set_attribute("messaging.destination.name", QUEUE_NAME)
+        client.rpush(QUEUE_NAME, json.dumps(message))
