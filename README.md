@@ -102,6 +102,12 @@ Si `NODE_NAME` contient la chaîne `DEGRADED_NODE_MATCH` (par défaut `eu-west-3
 - côté API, des logs de perte de connexion base sont écrits avec 2 à 3 retries espacés de 200 à 300 ms
 - côté worker, le traitement passe entre `3.5` et `6.0` secondes avec des logs de retry environ toutes les secondes
 
+Quand `POD_NAME`, `POD_NAMESPACE`, `POD_UID`, `NODE_NAME`, `DEPLOYMENT_NAME` ou `CONTAINER_NAME` sont présents (cas Kubernetes), ils sont ajoutés automatiquement :
+- aux logs JSON applicatifs
+- aux ressources OpenTelemetry des traces et métriques
+
+Hors Kubernetes, ces variables sont absentes et l'application continue simplement sans enrichissement K8s.
+
 ## Développement local sans Compose
 
 1. Lancer Postgres + Redis (via `docker compose up db redis` ou vos services locaux). Pour le mode léger, sautez cette étape et laissez `DB_BACKEND=sqlite` / `ENABLE_WORKER=false`.

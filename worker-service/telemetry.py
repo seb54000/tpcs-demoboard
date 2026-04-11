@@ -22,6 +22,14 @@ ENVIRONMENT = os.getenv("OTEL_ENVIRONMENT", "local")
 OTEL_ENABLED = os.getenv("OTEL_ENABLED", "false").lower() == "true"
 APP_LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
 APP_LOG_FILE = os.getenv("APP_LOG_FILE")
+K8S_ENV_TO_ATTR = {
+    "POD_NAME": "k8s.pod.name",
+    "POD_NAMESPACE": "k8s.namespace.name",
+    "POD_UID": "k8s.pod.uid",
+    "NODE_NAME": "k8s.node.name",
+    "DEPLOYMENT_NAME": "k8s.deployment.name",
+    "CONTAINER_NAME": "k8s.container.name",
+}
 WORKER_JOB_DURATION_BUCKETS_MS = tuple(
     float(value)
     for value in os.getenv(
@@ -30,6 +38,15 @@ WORKER_JOB_DURATION_BUCKETS_MS = tuple(
     ).split(",")
     if value.strip()
 )
+
+
+def _k8s_attributes() -> dict[str, str]:
+    attributes = {}
+    for env_name, attr_name in K8S_ENV_TO_ATTR.items():
+        value = os.getenv(env_name)
+        if value:
+            attributes[attr_name] = value
+    return attributes
 
 
 class JsonFormatter(logging.Formatter):
@@ -43,6 +60,7 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "service.name": SERVICE_NAME,
         }
+        payload.update(_k8s_attributes())
         if span_context.is_valid:
             payload["trace_id"] = f"{span_context.trace_id:032x}"
             payload["span_id"] = f"{span_context.span_id:016x}"
@@ -86,13 +104,13 @@ def configure_telemetry() -> None:
         configure_telemetry._configured = True
         return
 
-    resource = Resource.create(
-        {
-            "service.name": SERVICE_NAME,
-            "service.version": SERVICE_VERSION,
-            "deployment.environment": ENVIRONMENT,
-        }
-    )
+    resource_attributes = {
+        "service.name": SERVICE_NAME,
+        "service.version": SERVICE_VERSION,
+        "deployment.environment": ENVIRONMENT,
+    }
+    resource_attributes.update(_k8s_attributes())
+    resource = Resource.create(resource_attributes)
 
     tracer_provider = TracerProvider(resource=resource)
     tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
