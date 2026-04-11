@@ -144,7 +144,24 @@ Hors Kubernetes, ces variables sont absentes et l'application continue simplemen
 - Créer des manifests (Deployment + Service) pour chaque composant, ajouter un `StatefulSet`/`Deployment` pour PostgreSQL & Redis ou utiliser des offres managées.
 - Injecter la configuration (variables `DB_*`, `REDIS_*`, `VITE_API_URL`) via ConfigMap/Secret.
 
-Le dossier `kubernetes/` du dépôt pourra accueillir ces manifests pour aller plus loin en TP.
+Pour le TP monitoring EKS, deux manifests prêts à adapter sont fournis à la racine :
+
+- [`demoboard-kubernetes-observability.yml`](~/tpcs-demoboard/demoboard-kubernetes-observability.yml) :
+  - mode initial `v1`
+  - 1 replica pour `api`, `worker`, `frontend`
+  - évite l'AZ dégradée `eu-west-3c` via `nodeAffinity`
+- [`demoboard-kubernetes-observability-scaled.yml`](~/tpcs-demoboard/demoboard-kubernetes-observability-scaled.yml) :
+  - mode `v2` scalé
+  - `api=3`, `worker=6`, `frontend=3`
+  - répartition équilibrée via `topologySpreadConstraints` sur zone et hostname
+
+Les deux manifests utilisent par défaut un Ingress TLS de démonstration :
+- `https://demoboard-vm00.eks00.tpcsonline.org`
+
+Ils restent pensés pour être réécrits à la volée côté VM étudiante :
+- remplacement de `vm00` par le namespace étudiant
+- remplacement de `eks00` par le cluster ciblé
+- remplacement des images `localhost:32000/...` par les images poussées dans ECR
 
 ## Changelog
 

@@ -1,7 +1,7 @@
 # Demoboard - Kubernetes stack with OpenTelemetry enabled
-# Initial TP mode:
-# - 1 replica for stateless services
-# - avoids the degraded AZ/node for api and worker
+# Scaled TP mode:
+# - multiple replicas for stateless services
+# - topology spread constraints across zones and nodes
 ---
 apiVersion: v1
 kind: Namespace
@@ -106,7 +106,7 @@ metadata:
   name: demoboard-api
   namespace: vm00
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: demoboard-api
@@ -117,15 +117,19 @@ spec:
         app.kubernetes.io/name: demoboard
         app.kubernetes.io/component: api
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: topology.kubernetes.io/zone
-                    operator: NotIn
-                    values:
-                      - eu-west-3c
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: demoboard-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: demoboard-api
       containers:
         - name: api
           image: localhost:32000/api:v1
@@ -206,7 +210,7 @@ metadata:
   name: demoboard-worker
   namespace: vm00
 spec:
-  replicas: 1
+  replicas: 6
   selector:
     matchLabels:
       app: demoboard-worker
@@ -217,15 +221,19 @@ spec:
         app.kubernetes.io/name: demoboard
         app.kubernetes.io/component: worker
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: topology.kubernetes.io/zone
-                    operator: NotIn
-                    values:
-                      - eu-west-3c
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: demoboard-worker
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: demoboard-worker
       containers:
         - name: worker
           image: localhost:32000/worker:v1
@@ -310,7 +318,7 @@ metadata:
   name: demoboard-frontend
   namespace: vm00
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: demoboard-frontend
@@ -321,6 +329,19 @@ spec:
         app.kubernetes.io/name: demoboard
         app.kubernetes.io/component: frontend
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: demoboard-frontend
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: demoboard-frontend
       containers:
         - name: frontend
           image: localhost:32000/front:v2
