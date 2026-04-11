@@ -7,6 +7,8 @@ services:
       DB_BACKEND: sqlite
       SQLITE_PATH: /data/tasks.db
       ENABLE_WORKER: "false"
+      NODE_NAME: ${NODE_NAME:-}
+      DEGRADED_NODE_MATCH: ${DEGRADED_NODE_MATCH:-eu-west-3c}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
       OTEL_METRICS_EXEMPLAR_FILTER: ${OTEL_METRICS_EXEMPLAR_FILTER:-trace_based}
       OTEL_SERVICE_NAME: demoboard-api

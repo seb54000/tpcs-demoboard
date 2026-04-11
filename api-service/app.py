@@ -1,4 +1,5 @@
 import os
+import random
 import time
 from typing import List
 
@@ -20,6 +21,36 @@ from worker_queue import publish_job
 
 VALID_STATUSES = {"pending", "processing", "completed"}
 ENABLE_WORKER = os.getenv("ENABLE_WORKER", "true").lower() == "true"
+NODE_NAME = os.getenv("NODE_NAME", "")
+DEGRADED_NODE_MATCH = os.getenv("DEGRADED_NODE_MATCH", "eu-west-3c")
+
+
+def _is_degraded_node() -> bool:
+    return bool(NODE_NAME and DEGRADED_NODE_MATCH and DEGRADED_NODE_MATCH in NODE_NAME)
+
+
+def _simulate_api_db_reconnect(method: str, path: str) -> int:
+    if not _is_degraded_node():
+        return 0
+
+    retry_count = random.randint(2, 3)
+    for attempt in range(1, retry_count + 1):
+        logger.warning(
+            "Database connection lost on node %s while handling %s %s; retry %s/%s",
+            NODE_NAME,
+            method,
+            path,
+            attempt,
+            retry_count,
+        )
+        time.sleep(random.uniform(0.2, 0.3))
+    logger.info(
+        "Database connection restored on node %s for %s %s",
+        NODE_NAME,
+        method,
+        path,
+    )
+    return retry_count
 
 app = FastAPI(title="Demoboard API")
 app.add_middleware(
@@ -64,8 +95,13 @@ async def observe_requests(request: Request, call_next):
     raw_path = request.url.path
     span_name = f"{request.method} {raw_path}"
     with tracer.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
+        reconnect_retries = _simulate_api_db_reconnect(request.method, raw_path)
         span.set_attribute("http.method", request.method)
         span.set_attribute("url.path", raw_path)
+        span.set_attribute("node.name", NODE_NAME or "unknown")
+        span.set_attribute("node.degraded", _is_degraded_node())
+        if reconnect_retries:
+            span.set_attribute("api.db_reconnect_retries", reconnect_retries)
         try:
             response = await call_next(request)
         except Exception as exc:

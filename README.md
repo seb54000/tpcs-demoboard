@@ -77,6 +77,10 @@ Variables de configuration :
 | `WORKER_PROCESSING_TIME` | Force un temps fixe côté worker (en secondes) |
 | `WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse aléatoire du worker |
 | `WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute aléatoire du worker |
+| `DEGRADED_WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse worker en mode node dégradé |
+| `DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute worker en mode node dégradé |
+| `NODE_NAME` | Nom du node/pod host pour simuler un incident ciblé |
+| `DEGRADED_NODE_MATCH` | Sous-chaîne du node activant le mode dégradé |
 | `OTEL_ENABLED`      | Active l'export OTLP des traces et métriques        |
 | `OTEL_METRICS_EXEMPLAR_FILTER` | Stratégie d'exemplars OTEL, `trace_based` par défaut |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP HTTP du collector           |
@@ -94,6 +98,9 @@ Le dépôt est prêt pour un stack OTEL externe :
 
 En Docker Compose, la configuration par défaut cible un collector OTLP sur `http://host.docker.internal:4318`. Si le stack monitoring n'est pas lancé, mettez `OTEL_ENABLED=false`.
 Le worker simule par défaut un traitement aléatoire entre `1.5` et `2.7` secondes, ce qui peut être ajusté via `WORKER_PROCESSING_TIME_MIN_SECONDS` et `WORKER_PROCESSING_TIME_MAX_SECONDS`, ou forcé via `WORKER_PROCESSING_TIME`.
+Si `NODE_NAME` contient la chaîne `DEGRADED_NODE_MATCH` (par défaut `eu-west-3c`), l'application active un scénario pédagogique de dégradation :
+- côté API, des logs de perte de connexion base sont écrits avec 2 à 3 retries espacés de 200 à 300 ms
+- côté worker, le traitement passe entre `3.5` et `6.0` secondes avec des logs de retry environ toutes les secondes
 
 ## Développement local sans Compose
 

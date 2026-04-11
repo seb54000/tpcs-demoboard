@@ -137,6 +137,12 @@ spec:
               value: jobs
             - name: ENABLE_WORKER
               value: "true"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DEGRADED_NODE_MATCH
+              value: eu-west-3c
             - name: OTEL_ENABLED
               value: "true"
             - name: OTEL_METRICS_EXEMPLAR_FILTER
@@ -198,10 +204,20 @@ spec:
               value: redis
             - name: REDIS_QUEUE
               value: jobs
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DEGRADED_NODE_MATCH
+              value: eu-west-3c
             - name: WORKER_PROCESSING_TIME_MIN_SECONDS
               value: "1.5"
             - name: WORKER_PROCESSING_TIME_MAX_SECONDS
               value: "2.7"
+            - name: DEGRADED_WORKER_PROCESSING_TIME_MIN_SECONDS
+              value: "3.5"
+            - name: DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS
+              value: "6.0"
             - name: OTEL_ENABLED
               value: "true"
             - name: OTEL_METRICS_EXEMPLAR_FILTER
