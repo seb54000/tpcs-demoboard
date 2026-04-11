@@ -9,6 +9,7 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExp
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -21,6 +22,14 @@ ENVIRONMENT = os.getenv("OTEL_ENVIRONMENT", "local")
 OTEL_ENABLED = os.getenv("OTEL_ENABLED", "false").lower() == "true"
 APP_LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
 APP_LOG_FILE = os.getenv("APP_LOG_FILE")
+WORKER_JOB_DURATION_BUCKETS_MS = tuple(
+    float(value)
+    for value in os.getenv(
+        "WORKER_JOB_DURATION_BUCKETS_MS",
+        "100,250,500,750,1000,1250,1500,1750,2000,2250,2500,2750,3000,3500,4000,5000",
+    ).split(",")
+    if value.strip()
+)
 
 
 class JsonFormatter(logging.Formatter):
@@ -93,7 +102,18 @@ def configure_telemetry() -> None:
         OTLPMetricExporter(),
         export_interval_millis=int(os.getenv("OTEL_METRIC_EXPORT_INTERVAL", "5000")),
     )
-    meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+    meter_provider = MeterProvider(
+        resource=resource,
+        metric_readers=[metric_reader],
+        views=[
+            View(
+                instrument_name="demoboard_worker_job_duration_ms",
+                aggregation=ExplicitBucketHistogramAggregation(
+                    boundaries=WORKER_JOB_DURATION_BUCKETS_MS
+                ),
+            )
+        ],
+    )
     metrics.set_meter_provider(meter_provider)
 
     configure_telemetry._configured = True
