@@ -61,17 +61,20 @@ def healthcheck() -> dict:
 @app.middleware("http")
 async def observe_requests(request: Request, call_next):
     start = time.perf_counter()
-    span_name = f"{request.method} {request.url.path}"
+    raw_path = request.url.path
+    span_name = f"{request.method} {raw_path}"
     with tracer.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
         span.set_attribute("http.method", request.method)
-        span.set_attribute("url.path", request.url.path)
+        span.set_attribute("url.path", raw_path)
         try:
             response = await call_next(request)
         except Exception as exc:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", raw_path)
             duration_ms = (time.perf_counter() - start) * 1000
             labels = {
                 "http.method": request.method,
-                "url.path": request.url.path,
+                "url.path": route_path,
                 "http.status_code": 500,
             }
             request_counter.add(1, labels)
@@ -81,14 +84,17 @@ async def observe_requests(request: Request, call_next):
             logger.exception("Unhandled request error")
             raise
 
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", raw_path)
         duration_ms = (time.perf_counter() - start) * 1000
         labels = {
             "http.method": request.method,
-            "url.path": request.url.path,
+            "url.path": route_path,
             "http.status_code": response.status_code,
         }
         request_counter.add(1, labels)
         request_duration.record(duration_ms, labels)
+        span.set_attribute("http.route", route_path)
         span.set_attribute("http.status_code", response.status_code)
         if response.status_code >= 500:
             span.set_status(Status(StatusCode.ERROR))
