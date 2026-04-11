@@ -196,6 +196,10 @@ spec:
               value: redis
             - name: REDIS_QUEUE
               value: jobs
+            - name: WORKER_PROCESSING_TIME_MIN_SECONDS
+              value: "1.5"
+            - name: WORKER_PROCESSING_TIME_MAX_SECONDS
+              value: "2.7"
             - name: OTEL_ENABLED
               value: "true"
             - name: OTEL_SERVICE_NAME

@@ -74,6 +74,9 @@ Variables de configuration :
 | `DB_HOST/PORT/...`  | Paramètres PostgreSQL                               |
 | `ENABLE_WORKER`     | Active/désactive l'endpoint `/start-job` côté API   |
 | `VITE_ENABLE_WORKER`| Affiche/masque le bouton "Traitement long" côté UI  |
+| `WORKER_PROCESSING_TIME` | Force un temps fixe côté worker (en secondes) |
+| `WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse aléatoire du worker |
+| `WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute aléatoire du worker |
 | `OTEL_ENABLED`      | Active l'export OTLP des traces et métriques        |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP HTTP du collector           |
 | `APP_LOG_FILE`      | Fichier de logs JSON corrélés à OpenTelemetry       |
@@ -89,6 +92,7 @@ Le dépôt est prêt pour un stack OTEL externe :
 - **Logs applicatifs** : écrits sur stdout et dans `./observability-logs/` pour être collectés par Fluent Bit ou un autre agent.
 
 En Docker Compose, la configuration par défaut cible un collector OTLP sur `http://host.docker.internal:4318`. Si le stack monitoring n'est pas lancé, mettez `OTEL_ENABLED=false`.
+Le worker simule par défaut un traitement aléatoire entre `1.5` et `2.7` secondes, ce qui peut être ajusté via `WORKER_PROCESSING_TIME_MIN_SECONDS` et `WORKER_PROCESSING_TIME_MAX_SECONDS`, ou forcé via `WORKER_PROCESSING_TIME`.
 
 ## Développement local sans Compose
 

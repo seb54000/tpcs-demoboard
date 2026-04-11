@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import time
 
 import redis
@@ -22,11 +23,33 @@ def _parse_port(value: str | None, default: int) -> int:
         return default
 
 
+def _parse_float(value: str | None, default: float | None = None) -> float | None:
+    if value is None:
+        return default
+    candidate = value.strip()
+    if not candidate:
+        return default
+    try:
+        return float(candidate)
+    except ValueError:
+        return default
+
+
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = _parse_port(os.getenv("REDIS_PORT"), 6379)
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 QUEUE_NAME = os.getenv("REDIS_QUEUE", "jobs")
-PROCESSING_TIME = int(os.getenv("WORKER_PROCESSING_TIME", "5"))
+PROCESSING_TIME = _parse_float(os.getenv("WORKER_PROCESSING_TIME"))
+PROCESSING_TIME_MIN = _parse_float(os.getenv("WORKER_PROCESSING_TIME_MIN_SECONDS"), 1.5) or 1.5
+PROCESSING_TIME_MAX = _parse_float(os.getenv("WORKER_PROCESSING_TIME_MAX_SECONDS"), 2.7) or 2.7
+
+
+def _resolve_processing_time() -> float:
+    if PROCESSING_TIME is not None:
+        return max(PROCESSING_TIME, 0.0)
+    lower_bound = min(PROCESSING_TIME_MIN, PROCESSING_TIME_MAX)
+    upper_bound = max(PROCESSING_TIME_MIN, PROCESSING_TIME_MAX)
+    return random.uniform(lower_bound, upper_bound)
 
 
 def main() -> None:
@@ -48,11 +71,13 @@ def main() -> None:
             context=parent_context,
             kind=SpanKind.CONSUMER,
         ) as span:
+            processing_time = _resolve_processing_time()
             span.set_attribute("messaging.system", "redis")
             span.set_attribute("messaging.destination.name", QUEUE_NAME)
             span.set_attribute("task.id", task_id)
-            logger.info("Processing task %s", task_id)
-            time.sleep(PROCESSING_TIME)
+            span.set_attribute("worker.processing_time.seconds", processing_time)
+            logger.info("Processing task %s for %.3f seconds", task_id, processing_time)
+            time.sleep(processing_time)
 
             with tracer.start_as_current_span("worker.complete_task") as db_span:
                 db_span.set_attribute("task.id", task_id)
