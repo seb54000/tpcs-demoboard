@@ -78,6 +78,7 @@ Variables de configuration :
 | `WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse aléatoire du worker |
 | `WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute aléatoire du worker |
 | `OTEL_ENABLED`      | Active l'export OTLP des traces et métriques        |
+| `OTEL_METRICS_EXEMPLAR_FILTER` | Stratégie d'exemplars OTEL, `trace_based` par défaut |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP HTTP du collector           |
 | `APP_LOG_FILE`      | Fichier de logs JSON corrélés à OpenTelemetry       |
 

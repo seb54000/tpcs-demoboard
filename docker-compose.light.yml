@@ -8,6 +8,7 @@ services:
       SQLITE_PATH: /data/tasks.db
       ENABLE_WORKER: "false"
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_METRICS_EXEMPLAR_FILTER: ${OTEL_METRICS_EXEMPLAR_FILTER:-trace_based}
       OTEL_SERVICE_NAME: demoboard-api
       OTEL_ENVIRONMENT: ${OTEL_ENVIRONMENT:-docker-compose-light}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4318}
