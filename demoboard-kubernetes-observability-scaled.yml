@@ -14,7 +14,7 @@ metadata:
   name: demoboard-postgres-pvc
   namespace: vm00
 spec:
-  storageClassName: gp3
+  storageClassName: gp2
   accessModes: ["ReadWriteOnce"]
   resources:
     requests:
