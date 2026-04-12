@@ -9,6 +9,34 @@ metadata:
   name: vm00
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demoboard-node-metadata-reader
+  namespace: vm00
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vm00-demoboard-node-metadata-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vm00-demoboard-node-metadata-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vm00-demoboard-node-metadata-reader
+subjects:
+  - kind: ServiceAccount
+    name: demoboard-node-metadata-reader
+    namespace: vm00
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: demoboard-postgres-pvc
@@ -140,6 +168,7 @@ spec:
         app.kubernetes.io/name: demoboard
         app.kubernetes.io/component: api
     spec:
+      serviceAccountName: demoboard-node-metadata-reader
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -153,6 +182,22 @@ spec:
           labelSelector:
             matchLabels:
               app: demoboard-api
+      initContainers:
+        - name: detect-node-zone
+          image: bitnami/kubectl:1.35
+          command:
+            - /bin/sh
+            - -ceu
+            - |
+              kubectl get node "$NODE_NAME" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}' > /nodeinfo/node_zone
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: nodeinfo
+              mountPath: /nodeinfo
       containers:
         - name: api
           image: localhost:32000/api:v1
@@ -182,6 +227,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: NODE_ZONE_FILE
+              value: /var/run/demoboard/node_zone
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -198,7 +245,7 @@ spec:
               value: demoboard-api
             - name: CONTAINER_NAME
               value: api
-            - name: DEGRADED_NODE_MATCH
+            - name: DEGRADED_NODE_ZONE_MATCH
               value: eu-west-3c
             - name: OTEL_ENABLED
               value: "true"
@@ -228,6 +275,13 @@ spec:
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 10
+          volumeMounts:
+            - name: nodeinfo
+              mountPath: /var/run/demoboard
+              readOnly: true
+      volumes:
+        - name: nodeinfo
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -258,6 +312,7 @@ spec:
         app.kubernetes.io/name: demoboard
         app.kubernetes.io/component: worker
     spec:
+      serviceAccountName: demoboard-node-metadata-reader
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -271,6 +326,22 @@ spec:
           labelSelector:
             matchLabels:
               app: demoboard-worker
+      initContainers:
+        - name: detect-node-zone
+          image: bitnami/kubectl:1.35
+          command:
+            - /bin/sh
+            - -ceu
+            - |
+              kubectl get node "$NODE_NAME" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}' > /nodeinfo/node_zone
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: nodeinfo
+              mountPath: /nodeinfo
       containers:
         - name: worker
           image: localhost:32000/worker:v1
@@ -294,6 +365,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: NODE_ZONE_FILE
+              value: /var/run/demoboard/node_zone
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -310,7 +383,7 @@ spec:
               value: demoboard-worker
             - name: CONTAINER_NAME
               value: worker
-            - name: DEGRADED_NODE_MATCH
+            - name: DEGRADED_NODE_ZONE_MATCH
               value: eu-west-3c
             - name: WORKER_PROCESSING_TIME_MIN_SECONDS
               value: "1.5"
@@ -336,6 +409,13 @@ spec:
               value: http://otel-collector:4318
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
               value: http/protobuf
+          volumeMounts:
+            - name: nodeinfo
+              mountPath: /var/run/demoboard
+              readOnly: true
+      volumes:
+        - name: nodeinfo
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

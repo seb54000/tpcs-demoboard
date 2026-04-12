@@ -26,11 +26,13 @@ OTEL_ENABLED = os.getenv("OTEL_ENABLED", "false").lower() == "true"
 OTEL_LOGS_ENABLED = os.getenv("OTEL_LOGS_ENABLED", "false").lower() == "true"
 APP_LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
 APP_LOG_FILE = os.getenv("APP_LOG_FILE")
+NODE_ZONE_FILE = os.getenv("NODE_ZONE_FILE", "/var/run/demoboard/node_zone")
 K8S_ENV_TO_ATTR = {
     "POD_NAME": "k8s.pod.name",
     "POD_NAMESPACE": "k8s.namespace.name",
     "POD_UID": "k8s.pod.uid",
     "NODE_NAME": "k8s.node.name",
+    "NODE_ZONE": "k8s.node.zone",
     "DEPLOYMENT_NAME": "k8s.deployment.name",
     "CONTAINER_NAME": "k8s.container.name",
 }
@@ -40,6 +42,11 @@ def _k8s_attributes() -> dict[str, str]:
     attributes = {}
     for env_name, attr_name in K8S_ENV_TO_ATTR.items():
         value = os.getenv(env_name)
+        if not value and env_name == "NODE_ZONE":
+            try:
+                value = open(NODE_ZONE_FILE, "r", encoding="utf-8").read().strip()
+            except OSError:
+                value = ""
         if value:
             attributes[attr_name] = value
     return attributes

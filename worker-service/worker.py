@@ -49,11 +49,30 @@ DEGRADED_PROCESSING_TIME_MAX = (
     _parse_float(os.getenv("DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS"), 6.0) or 6.0
 )
 NODE_NAME = os.getenv("NODE_NAME", "")
-DEGRADED_NODE_MATCH = os.getenv("DEGRADED_NODE_MATCH", "eu-west-3c")
+NODE_ZONE_FILE = os.getenv("NODE_ZONE_FILE", "/var/run/demoboard/node_zone")
+DEGRADED_NODE_ZONE_MATCH = os.getenv(
+    "DEGRADED_NODE_ZONE_MATCH",
+    os.getenv("DEGRADED_NODE_MATCH", "eu-west-3c"),
+)
+
+
+def _resolve_node_zone() -> str:
+    env_value = os.getenv("NODE_ZONE", "").strip()
+    if env_value:
+        return env_value
+    try:
+        return open(NODE_ZONE_FILE, "r", encoding="utf-8").read().strip()
+    except OSError:
+        return ""
+
+
+NODE_ZONE = _resolve_node_zone()
 
 
 def _is_degraded_node() -> bool:
-    return bool(NODE_NAME and DEGRADED_NODE_MATCH and DEGRADED_NODE_MATCH in NODE_NAME)
+    return bool(
+        NODE_ZONE and DEGRADED_NODE_ZONE_MATCH and DEGRADED_NODE_ZONE_MATCH in NODE_ZONE
+    )
 
 
 def _resolve_processing_time() -> float:
@@ -79,14 +98,14 @@ def _simulate_processing(processing_time: float, task_id: int) -> int:
         sleep_for = min(1.0, remaining)
         logger.warning(
             "Worker issue detected on node %s for task %s; retrying processing step in %.1f seconds",
-            NODE_NAME,
+            NODE_ZONE or NODE_NAME or "unknown",
             task_id,
             sleep_for,
         )
         time.sleep(sleep_for)
         remaining -= sleep_for
         retry_logs += 1
-    logger.info("Worker recovered on node %s for task %s", NODE_NAME, task_id)
+    logger.info("Worker recovered on node %s for task %s", NODE_ZONE or NODE_NAME or "unknown", task_id)
     return retry_logs
 
 
@@ -115,6 +134,7 @@ def main() -> None:
             span.set_attribute("task.id", task_id)
             span.set_attribute("worker.processing_time.seconds", processing_time)
             span.set_attribute("node.name", NODE_NAME or "unknown")
+            span.set_attribute("node.zone", NODE_ZONE or "unknown")
             span.set_attribute("node.degraded", _is_degraded_node())
             logger.info("Processing task %s for %.3f seconds", task_id, processing_time)
             retry_logs = _simulate_processing(processing_time, task_id)

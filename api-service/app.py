@@ -22,11 +22,30 @@ from worker_queue import publish_job
 VALID_STATUSES = {"pending", "processing", "completed"}
 ENABLE_WORKER = os.getenv("ENABLE_WORKER", "true").lower() == "true"
 NODE_NAME = os.getenv("NODE_NAME", "")
-DEGRADED_NODE_MATCH = os.getenv("DEGRADED_NODE_MATCH", "eu-west-3c")
+NODE_ZONE_FILE = os.getenv("NODE_ZONE_FILE", "/var/run/demoboard/node_zone")
+DEGRADED_NODE_ZONE_MATCH = os.getenv(
+    "DEGRADED_NODE_ZONE_MATCH",
+    os.getenv("DEGRADED_NODE_MATCH", "eu-west-3c"),
+)
+
+
+def _resolve_node_zone() -> str:
+    env_value = os.getenv("NODE_ZONE", "").strip()
+    if env_value:
+        return env_value
+    try:
+        return open(NODE_ZONE_FILE, "r", encoding="utf-8").read().strip()
+    except OSError:
+        return ""
+
+
+NODE_ZONE = _resolve_node_zone()
 
 
 def _is_degraded_node() -> bool:
-    return bool(NODE_NAME and DEGRADED_NODE_MATCH and DEGRADED_NODE_MATCH in NODE_NAME)
+    return bool(
+        NODE_ZONE and DEGRADED_NODE_ZONE_MATCH and DEGRADED_NODE_ZONE_MATCH in NODE_ZONE
+    )
 
 
 def _simulate_api_db_reconnect(method: str, path: str) -> int:
@@ -37,7 +56,7 @@ def _simulate_api_db_reconnect(method: str, path: str) -> int:
     for attempt in range(1, retry_count + 1):
         logger.warning(
             "Database connection lost on node %s while handling %s %s; retry %s/%s",
-            NODE_NAME,
+            NODE_ZONE or NODE_NAME or "unknown",
             method,
             path,
             attempt,
@@ -46,7 +65,7 @@ def _simulate_api_db_reconnect(method: str, path: str) -> int:
         time.sleep(random.uniform(0.2, 0.3))
     logger.info(
         "Database connection restored on node %s for %s %s",
-        NODE_NAME,
+        NODE_ZONE or NODE_NAME or "unknown",
         method,
         path,
     )
@@ -99,6 +118,7 @@ async def observe_requests(request: Request, call_next):
         span.set_attribute("http.method", request.method)
         span.set_attribute("url.path", raw_path)
         span.set_attribute("node.name", NODE_NAME or "unknown")
+        span.set_attribute("node.zone", NODE_ZONE or "unknown")
         span.set_attribute("node.degraded", _is_degraded_node())
         if reconnect_retries:
             span.set_attribute("api.db_reconnect_retries", reconnect_retries)

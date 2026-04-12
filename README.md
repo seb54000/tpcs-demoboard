@@ -79,8 +79,9 @@ Variables de configuration :
 | `WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute aléatoire du worker |
 | `DEGRADED_WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse worker en mode node dégradé |
 | `DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute worker en mode node dégradé |
-| `NODE_NAME` | Nom du node/pod host pour simuler un incident ciblé |
-| `DEGRADED_NODE_MATCH` | Sous-chaîne du node activant le mode dégradé |
+| `NODE_NAME` | Nom du node/pod host conservé pour les labels, spans et logs |
+| `NODE_ZONE` | Zone logique du node utilisée pour déclencher le mode dégradé |
+| `DEGRADED_NODE_ZONE_MATCH` | Valeur de zone activant le mode dégradé |
 | `OTEL_ENABLED`      | Active l'export OTLP des traces et métriques        |
 | `OTEL_METRICS_EXEMPLAR_FILTER` | Stratégie d'exemplars OTEL, `trace_based` par défaut |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP HTTP du collector           |
@@ -98,11 +99,17 @@ Le dépôt est prêt pour un stack OTEL externe :
 
 En Docker Compose, la configuration par défaut cible un collector OTLP sur `http://host.docker.internal:4318`. Si le stack monitoring n'est pas lancé, mettez `OTEL_ENABLED=false`.
 Le worker simule par défaut un traitement aléatoire entre `1.5` et `2.7` secondes, ce qui peut être ajusté via `WORKER_PROCESSING_TIME_MIN_SECONDS` et `WORKER_PROCESSING_TIME_MAX_SECONDS`, ou forcé via `WORKER_PROCESSING_TIME`.
-Si `NODE_NAME` contient la chaîne `DEGRADED_NODE_MATCH` (par défaut `eu-west-3c`), l'application active un scénario pédagogique de dégradation :
+Si `NODE_ZONE` correspond à `DEGRADED_NODE_ZONE_MATCH` (par défaut `eu-west-3c`), l'application active un scénario pédagogique de dégradation :
 - côté API, des logs de perte de connexion base sont écrits avec 2 à 3 retries espacés de 200 à 300 ms
 - côté worker, le traitement passe entre `3.5` et `6.0` secondes avec des logs de retry environ toutes les secondes
 
-Quand `POD_NAME`, `POD_NAMESPACE`, `POD_UID`, `NODE_NAME`, `DEPLOYMENT_NAME` ou `CONTAINER_NAME` sont présents (cas Kubernetes), ils sont ajoutés automatiquement :
+En Docker, on peut donc simuler ce scénario simplement avec :
+
+```bash
+NODE_ZONE=eu-west-3c docker compose up --build
+```
+
+Quand `POD_NAME`, `POD_NAMESPACE`, `POD_UID`, `NODE_NAME`, `NODE_ZONE`, `DEPLOYMENT_NAME` ou `CONTAINER_NAME` sont présents (cas Kubernetes), ils sont ajoutés automatiquement :
 - aux logs JSON applicatifs
 - aux ressources OpenTelemetry des traces et métriques
 
@@ -168,3 +175,4 @@ Ils restent pensés pour être réécrits à la volée côté VM étudiante :
 - 2026-03-11 : Frontend mis à jour pour un build propre (npm 11.11.0 dans l'image, passage à `vite` 7.3.1 et `@vitejs/plugin-vue` 6.0.4, ajout de `package-lock.json`, installation via `npm ci`) avec suppression de l'alerte de version npm et audit npm sans vulnérabilité.
 - 2026-03-11 : Builds Python (`api-service` et `worker-service`) nettoyés en supprimant les warnings pip liés à l'exécution en root via configuration `PIP_ROOT_USER_ACTION=ignore` et `PIP_DISABLE_PIP_VERSION_CHECK=1`.
 - 2026-03-12 : Dockerfile/frontend clarifié pour le TP avec sortie de build explicitement fixée vers `/app/dist` (`vite build --outDir dist` + `build.outDir = "dist"`), afin d'expliquer le `COPY --from=build /app/dist ...`.
+- 2026-04-12 : Le scénario pédagogique de dégradation se base désormais sur `NODE_ZONE` au lieu de `NODE_NAME`, avec récupération automatique de la zone Kubernetes via un init container lisant le label `topology.kubernetes.io/zone`.
