@@ -184,7 +184,7 @@ spec:
               app: demoboard-api
       initContainers:
         - name: detect-node-zone
-          image: bitnami/kubectl:1.35
+          image: bitnami/kubectl:latest
           command:
             - /bin/sh
             - -ceu
@@ -328,7 +328,7 @@ spec:
               app: demoboard-worker
       initContainers:
         - name: detect-node-zone
-          image: bitnami/kubectl:1.35
+          image: bitnami/kubectl:latest
           command:
             - /bin/sh
             - -ceu
