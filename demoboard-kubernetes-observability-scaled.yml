@@ -202,6 +202,8 @@ spec:
               value: eu-west-3c
             - name: OTEL_ENABLED
               value: "true"
+            - name: OTEL_LOGS_ENABLED
+              value: "true"
             - name: OTEL_METRICS_EXEMPLAR_FILTER
               value: trace_based
             - name: OTEL_SERVICE_NAME
@@ -319,6 +321,8 @@ spec:
             - name: DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS
               value: "6.0"
             - name: OTEL_ENABLED
+              value: "true"
+            - name: OTEL_LOGS_ENABLED
               value: "true"
             - name: OTEL_METRICS_EXEMPLAR_FILTER
               value: trace_based

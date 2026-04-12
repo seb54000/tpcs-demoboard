@@ -5,8 +5,12 @@ import sys
 from datetime import datetime, timezone
 
 from opentelemetry import metrics, trace
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
@@ -19,6 +23,7 @@ SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "demoboard-api")
 SERVICE_VERSION = os.getenv("OTEL_SERVICE_VERSION", "0.1.0")
 ENVIRONMENT = os.getenv("OTEL_ENVIRONMENT", "local")
 OTEL_ENABLED = os.getenv("OTEL_ENABLED", "false").lower() == "true"
+OTEL_LOGS_ENABLED = os.getenv("OTEL_LOGS_ENABLED", "false").lower() == "true"
 APP_LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
 APP_LOG_FILE = os.getenv("APP_LOG_FILE")
 K8S_ENV_TO_ATTR = {
@@ -118,6 +123,14 @@ def configure_telemetry() -> None:
     )
     meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
     metrics.set_meter_provider(meter_provider)
+
+    if OTEL_LOGS_ENABLED:
+        logger_provider = LoggerProvider(resource=resource)
+        logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
+        set_logger_provider(logger_provider)
+        logging.getLogger().addHandler(
+            LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
+        )
 
     configure_telemetry._configured = True
 
