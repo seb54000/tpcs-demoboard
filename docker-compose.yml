@@ -34,11 +34,25 @@ services:
       REDIS_HOST: redis
       REDIS_QUEUE: jobs
       ENABLE_WORKER: "true"
+      NODE_NAME: ${NODE_NAME:-}
+      NODE_ZONE: ${NODE_ZONE:-}
+      DEGRADED_NODE_ZONE_MATCH: ${DEGRADED_NODE_ZONE_MATCH:-eu-west-3c}
+      OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_METRICS_EXEMPLAR_FILTER: ${OTEL_METRICS_EXEMPLAR_FILTER:-trace_based}
+      OTEL_SERVICE_NAME: demoboard-api
+      OTEL_ENVIRONMENT: ${OTEL_ENVIRONMENT:-docker-compose}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      APP_LOG_FILE: /var/log/demoboard/api-service.log
     depends_on:
       - db
       - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
+    volumes:
+      - ./observability-logs/api:/var/log/demoboard
 
   worker-service:
     build: ./worker-service
@@ -50,9 +64,27 @@ services:
       DB_PASSWORD: postgres
       REDIS_HOST: redis
       REDIS_QUEUE: jobs
+      NODE_NAME: ${NODE_NAME:-}
+      NODE_ZONE: ${NODE_ZONE:-}
+      DEGRADED_NODE_ZONE_MATCH: ${DEGRADED_NODE_ZONE_MATCH:-eu-west-3c}
+      WORKER_PROCESSING_TIME_MIN_SECONDS: ${WORKER_PROCESSING_TIME_MIN_SECONDS:-1.5}
+      WORKER_PROCESSING_TIME_MAX_SECONDS: ${WORKER_PROCESSING_TIME_MAX_SECONDS:-2.7}
+      DEGRADED_WORKER_PROCESSING_TIME_MIN_SECONDS: ${DEGRADED_WORKER_PROCESSING_TIME_MIN_SECONDS:-3.5}
+      DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS: ${DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS:-6.0}
+      OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_METRICS_EXEMPLAR_FILTER: ${OTEL_METRICS_EXEMPLAR_FILTER:-trace_based}
+      OTEL_SERVICE_NAME: demoboard-worker
+      OTEL_ENVIRONMENT: ${OTEL_ENVIRONMENT:-docker-compose}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      APP_LOG_FILE: /var/log/demoboard/worker-service.log
     depends_on:
       - db
       - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./observability-logs/worker:/var/log/demoboard
 
   frontend-service:
     build:
@@ -64,6 +96,8 @@ services:
       - api-service
     ports:
       - "8080:80"
+    volumes:
+      - ./observability-logs/frontend:/var/log/nginx
 
 volumes:
   pgdata:

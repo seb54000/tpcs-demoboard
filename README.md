@@ -74,6 +74,46 @@ Variables de configuration :
 | `DB_HOST/PORT/...`  | Paramètres PostgreSQL                               |
 | `ENABLE_WORKER`     | Active/désactive l'endpoint `/start-job` côté API   |
 | `VITE_ENABLE_WORKER`| Affiche/masque le bouton "Traitement long" côté UI  |
+| `WORKER_PROCESSING_TIME` | Force un temps fixe côté worker (en secondes) |
+| `WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse aléatoire du worker |
+| `WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute aléatoire du worker |
+| `DEGRADED_WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse worker en mode node dégradé |
+| `DEGRADED_WORKER_PROCESSING_TIME_MAX_SECONDS` | Borne haute worker en mode node dégradé |
+| `NODE_NAME` | Nom du node/pod host conservé pour les labels, spans et logs |
+| `NODE_ZONE` | Zone logique du node utilisée pour déclencher le mode dégradé |
+| `DEGRADED_NODE_ZONE_MATCH` | Valeur de zone activant le mode dégradé |
+| `OTEL_ENABLED`      | Active l'export OTLP des traces et métriques        |
+| `OTEL_METRICS_EXEMPLAR_FILTER` | Stratégie d'exemplars OTEL, `trace_based` par défaut |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OTLP HTTP du collector           |
+| `APP_LOG_FILE`      | Fichier de logs JSON corrélés à OpenTelemetry       |
+
+## Observabilité
+
+Le dépôt est prêt pour un stack OTEL externe :
+
+- **API** : traces OTEL sur chaque requête, spans métier (`tasks.create`, `tasks.start_job`, etc.), métriques d'API, logs JSON avec `trace_id`/`span_id`.
+- **Worker** : traces OTEL sur la consommation Redis, propagation de contexte depuis l'API vers le worker, métriques de traitement, logs JSON corrélés.
+- **Frontend** : logs JSON Nginx collectables dans la même chaîne de logs. Pour des traces navigateur OTEL, il faudra ajouter une instrumentation web dédiée côté Vue.
+- **PostgreSQL / Redis** : on **ne modifie pas** les images officielles ; on collecte leurs métriques via des exporters dédiés (`postgres-exporter`, `redis-exporter`) dans le dépôt monitoring.
+- **Logs applicatifs** : écrits sur stdout et dans `./observability-logs/` pour être collectés par Fluent Bit ou un autre agent.
+
+En Docker Compose, la configuration par défaut cible un collector OTLP sur `http://host.docker.internal:4318`. Si le stack monitoring n'est pas lancé, mettez `OTEL_ENABLED=false`.
+Le worker simule par défaut un traitement aléatoire entre `1.5` et `2.7` secondes, ce qui peut être ajusté via `WORKER_PROCESSING_TIME_MIN_SECONDS` et `WORKER_PROCESSING_TIME_MAX_SECONDS`, ou forcé via `WORKER_PROCESSING_TIME`.
+Si `NODE_ZONE` correspond à `DEGRADED_NODE_ZONE_MATCH` (par défaut `eu-west-3c`), l'application active un scénario pédagogique de dégradation :
+- côté API, des logs de perte de connexion base sont écrits avec 2 à 3 retries espacés de 200 à 300 ms
+- côté worker, le traitement passe entre `3.5` et `6.0` secondes avec des logs de retry environ toutes les secondes
+
+En Docker, on peut donc simuler ce scénario simplement avec :
+
+```bash
+NODE_ZONE=eu-west-3c docker compose up --build
+```
+
+Quand `POD_NAME`, `POD_NAMESPACE`, `POD_UID`, `NODE_NAME`, `NODE_ZONE`, `DEPLOYMENT_NAME` ou `CONTAINER_NAME` sont présents (cas Kubernetes), ils sont ajoutés automatiquement :
+- aux logs JSON applicatifs
+- aux ressources OpenTelemetry des traces et métriques
+
+Hors Kubernetes, ces variables sont absentes et l'application continue simplement sans enrichissement K8s.
 
 ## Développement local sans Compose
 
@@ -111,10 +151,28 @@ Variables de configuration :
 - Créer des manifests (Deployment + Service) pour chaque composant, ajouter un `StatefulSet`/`Deployment` pour PostgreSQL & Redis ou utiliser des offres managées.
 - Injecter la configuration (variables `DB_*`, `REDIS_*`, `VITE_API_URL`) via ConfigMap/Secret.
 
-Le dossier `kubernetes/` du dépôt pourra accueillir ces manifests pour aller plus loin en TP.
+Pour le TP monitoring EKS, deux manifests prêts à adapter sont fournis à la racine :
+
+- [`demoboard-kubernetes-observability.yml`](~/tpcs-demoboard/demoboard-kubernetes-observability.yml) :
+  - mode initial `v1`
+  - 1 replica pour `api`, `worker`, `frontend`
+  - évite l'AZ dégradée `eu-west-3c` via `nodeAffinity`
+- [`demoboard-kubernetes-observability-scaled.yml`](~/tpcs-demoboard/demoboard-kubernetes-observability-scaled.yml) :
+  - mode `v2` scalé
+  - `api=3`, `worker=6`, `frontend=3`
+  - répartition équilibrée via `topologySpreadConstraints` sur zone et hostname
+
+Les deux manifests utilisent par défaut un Ingress TLS de démonstration :
+- `https://demoboard-vm00.eks00.tpcsonline.org`
+
+Ils restent pensés pour être réécrits à la volée côté VM étudiante :
+- remplacement de `vm00` par le namespace étudiant
+- remplacement de `eks00` par le cluster ciblé
+- remplacement des images `localhost:32000/...` par les images poussées dans ECR
 
 ## Changelog
 
 - 2026-03-11 : Frontend mis à jour pour un build propre (npm 11.11.0 dans l'image, passage à `vite` 7.3.1 et `@vitejs/plugin-vue` 6.0.4, ajout de `package-lock.json`, installation via `npm ci`) avec suppression de l'alerte de version npm et audit npm sans vulnérabilité.
 - 2026-03-11 : Builds Python (`api-service` et `worker-service`) nettoyés en supprimant les warnings pip liés à l'exécution en root via configuration `PIP_ROOT_USER_ACTION=ignore` et `PIP_DISABLE_PIP_VERSION_CHECK=1`.
 - 2026-03-12 : Dockerfile/frontend clarifié pour le TP avec sortie de build explicitement fixée vers `/app/dist` (`vite build --outDir dist` + `build.outDir = "dist"`), afin d'expliquer le `COPY --from=build /app/dist ...`.
+- 2026-04-12 : Le scénario pédagogique de dégradation se base désormais sur `NODE_ZONE` au lieu de `NODE_NAME`, avec récupération automatique de la zone Kubernetes via un init container lisant le label `topology.kubernetes.io/zone`.

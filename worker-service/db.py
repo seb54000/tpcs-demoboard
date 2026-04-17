@@ -1,10 +1,14 @@
 import os
 import time
+import logging
 from contextlib import contextmanager
 from typing import Iterator
 
 import psycopg2
 from psycopg2.extensions import connection
+
+
+logger = logging.getLogger("demoboard-worker")
 
 
 DB_HOST = os.getenv("DB_HOST", "postgres")
@@ -29,8 +33,11 @@ def _create_connection() -> connection:
             )
         except psycopg2.OperationalError as exc:
             last_exc = exc
-            print(
-                f"[worker-service] Database unavailable (attempt {attempt}/{DB_MAX_RETRIES}): {exc}"
+            logger.warning(
+                "Database unavailable (attempt %s/%s): %s",
+                attempt,
+                DB_MAX_RETRIES,
+                exc,
             )
             time.sleep(DB_RETRY_DELAY)
     raise RuntimeError("Could not connect to database") from last_exc
