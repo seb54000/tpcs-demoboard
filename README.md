@@ -63,7 +63,7 @@ Dans ce mode `ENABLE_WORKER=false` et `VITE_ENABLE_WORKER=false` : l'UI n'affich
 - `PUT /tasks/{id}` : met à jour `title` et/ou `status`.
 - `DELETE /tasks/{id}` : supprime.
 - `POST /tasks/{id}/start-job` : passe la tâche en `processing`, envoie un message Redis, le worker termine et met `completed`.
-- `GET /healthz` : ping rapide.
+- `GET /healthz` : ping rapide, avec la version API lue depuis `api-service/VERSION`.
 
 Variables de configuration :
 
@@ -73,6 +73,7 @@ Variables de configuration :
 | `SQLITE_PATH`       | Chemin du fichier SQLite dans le container          |
 | `DB_HOST/PORT/...`  | Paramètres PostgreSQL                               |
 | `ENABLE_WORKER`     | Active/désactive l'endpoint `/start-job` côté API   |
+| `DEMOBOARD_API_VERSION` | Surcharge optionnelle de la version API affichée par `/healthz` |
 | `VITE_ENABLE_WORKER`| Affiche/masque le bouton "Traitement long" côté UI  |
 | `WORKER_PROCESSING_TIME` | Force un temps fixe côté worker (en secondes) |
 | `WORKER_PROCESSING_TIME_MIN_SECONDS` | Borne basse aléatoire du worker |
@@ -176,3 +177,4 @@ Ils restent pensés pour être réécrits à la volée côté VM étudiante :
 - 2026-03-11 : Builds Python (`api-service` et `worker-service`) nettoyés en supprimant les warnings pip liés à l'exécution en root via configuration `PIP_ROOT_USER_ACTION=ignore` et `PIP_DISABLE_PIP_VERSION_CHECK=1`.
 - 2026-03-12 : Dockerfile/frontend clarifié pour le TP avec sortie de build explicitement fixée vers `/app/dist` (`vite build --outDir dist` + `build.outDir = "dist"`), afin d'expliquer le `COPY --from=build /app/dist ...`.
 - 2026-04-12 : Le scénario pédagogique de dégradation se base désormais sur `NODE_ZONE` au lieu de `NODE_NAME`, avec récupération automatique de la zone Kubernetes via un init container lisant le label `topology.kubernetes.io/zone`.
+- 2026-05-09 : Ajout de `api-service/VERSION` et exposition de la version API dans `/healthz` pour faciliter les exercices de rolling update.

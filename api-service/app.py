@@ -17,9 +17,11 @@ from telemetry import (
     task_create_counter,
     tracer,
 )
+from version import get_app_version
 from worker_queue import publish_job
 
 VALID_STATUSES = {"pending", "processing", "completed"}
+APP_VERSION = get_app_version()
 ENABLE_WORKER = os.getenv("ENABLE_WORKER", "true").lower() == "true"
 NODE_NAME = os.getenv("NODE_NAME", "")
 NODE_ZONE_FILE = os.getenv("NODE_ZONE_FILE", "/var/run/demoboard/node_zone")
@@ -105,7 +107,12 @@ def _validate_status(status: str | None) -> None:
 
 @app.get("/healthz")
 def healthcheck() -> dict:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "node": NODE_NAME or "unknown",
+        "zone": NODE_ZONE or "unknown",
+    }
 
 
 @app.middleware("http")
