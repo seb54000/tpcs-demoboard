@@ -18,9 +18,10 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import get_current_span
 
+from version import get_app_version
 
 SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "demoboard-api")
-SERVICE_VERSION = os.getenv("OTEL_SERVICE_VERSION", "0.1.0")
+SERVICE_VERSION = os.getenv("OTEL_SERVICE_VERSION", get_app_version())
 ENVIRONMENT = os.getenv("OTEL_ENVIRONMENT", "local")
 OTEL_ENABLED = os.getenv("OTEL_ENABLED", "false").lower() == "true"
 OTEL_LOGS_ENABLED = os.getenv("OTEL_LOGS_ENABLED", "false").lower() == "true"
