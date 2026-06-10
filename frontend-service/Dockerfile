@@ -2,10 +2,11 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-RUN npm install -g npm@11.11.0
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
+    NPM_CONFIG_FUND=false
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --audit=false
 
 ARG VITE_API_URL=/api
 ARG VITE_ENABLE_WORKER=true

@@ -173,6 +173,7 @@ Ils restent pensés pour être réécrits à la volée côté VM étudiante :
 
 ## Changelog
 
+- 2026-06-10 : Frontend remis au propre côté npm/Docker : suppression du pin global `npm@11.11.0`, désactivation des notices npm dans l'image, installation via `npm ci --audit=false`, passage à `vite` 8.0.16 et `@vitejs/plugin-vue` 6.0.7 avec audit npm sans vulnérabilité.
 - 2026-03-11 : Frontend mis à jour pour un build propre (npm 11.11.0 dans l'image, passage à `vite` 7.3.1 et `@vitejs/plugin-vue` 6.0.4, ajout de `package-lock.json`, installation via `npm ci`) avec suppression de l'alerte de version npm et audit npm sans vulnérabilité.
 - 2026-03-11 : Builds Python (`api-service` et `worker-service`) nettoyés en supprimant les warnings pip liés à l'exécution en root via configuration `PIP_ROOT_USER_ACTION=ignore` et `PIP_DISABLE_PIP_VERSION_CHECK=1`.
 - 2026-03-12 : Dockerfile/frontend clarifié pour le TP avec sortie de build explicitement fixée vers `/app/dist` (`vite build --outDir dist` + `build.outDir = "dist"`), afin d'expliquer le `COPY --from=build /app/dist ...`.
