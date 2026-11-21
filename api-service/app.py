@@ -121,6 +121,11 @@ async def observe_requests(request: Request, call_next):
     raw_path = request.url.path
     span_name = f"{request.method} {raw_path}"
     with tracer.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
+        logger.info(
+            "demoboard.lifecycle action=request.started method=%s path=%s",
+            request.method,
+            raw_path,
+        )
         reconnect_retries = _simulate_api_db_reconnect(request.method, raw_path)
         span.set_attribute("http.method", request.method)
         span.set_attribute("url.path", raw_path)
@@ -144,7 +149,11 @@ async def observe_requests(request: Request, call_next):
             request_duration.record(duration_ms, labels)
             span.record_exception(exc)
             span.set_status(Status(StatusCode.ERROR))
-            logger.exception("Unhandled request error")
+            logger.exception(
+                "demoboard.lifecycle action=request.failed method=%s path=%s status=500",
+                request.method,
+                route_path,
+            )
             raise
 
         route = request.scope.get("route")
@@ -161,6 +170,13 @@ async def observe_requests(request: Request, call_next):
         span.set_attribute("http.status_code", response.status_code)
         if response.status_code >= 500:
             span.set_status(Status(StatusCode.ERROR))
+        logger.info(
+            "demoboard.lifecycle action=request.completed method=%s path=%s status=%s duration_ms=%.2f",
+            request.method,
+            route_path,
+            response.status_code,
+            duration_ms,
+        )
         return response
 
 
@@ -168,6 +184,8 @@ async def observe_requests(request: Request, call_next):
 def create_task(task: TaskCreate) -> Task:
     with tracer.start_as_current_span("tasks.create") as span:
         span.set_attribute("task.title", task.title)
+        logger.info("demoboard.lifecycle action=task.create.started")
+        logger.info("demoboard.lifecycle action=task.create.database_write.started")
         with get_db() as conn:
             with get_cursor(conn) as cursor:
                 if DB_BACKEND == "postgres":
@@ -191,18 +209,29 @@ def create_task(task: TaskCreate) -> Task:
         created_task = _row_to_task(row)
         span.set_attribute("task.id", created_task.id)
         task_create_counter.add(1, {"status": created_task.status})
-        logger.info("Task created")
+        logger.info(
+            "demoboard.lifecycle action=task.create.database_write.completed task_id=%s status=%s",
+            created_task.id,
+            created_task.status,
+        )
+        logger.info(
+            "demoboard.lifecycle action=task.create.completed task_id=%s status=%s",
+            created_task.id,
+            created_task.status,
+        )
         return created_task
 
 
 @app.get("/tasks", response_model=List[Task])
 def list_tasks() -> List[Task]:
     with tracer.start_as_current_span("tasks.list") as span:
+        logger.info("demoboard.lifecycle action=task.list.started")
         with get_db() as conn:
             with get_cursor(conn) as cursor:
                 cursor.execute(format_sql("SELECT id, title, status FROM tasks ORDER BY id"))
                 rows = cursor.fetchall()
         span.set_attribute("tasks.count", len(rows))
+        logger.info("demoboard.lifecycle action=task.list.completed count=%s", len(rows))
         return [_row_to_task(row) for row in rows]
 
 
@@ -210,6 +239,7 @@ def list_tasks() -> List[Task]:
 def get_task(task_id: int) -> Task:
     with tracer.start_as_current_span("tasks.get") as span:
         span.set_attribute("task.id", task_id)
+        logger.info("demoboard.lifecycle action=task.get.started task_id=%s", task_id)
         with get_db() as conn:
             with get_cursor(conn) as cursor:
                 cursor.execute(
@@ -218,7 +248,13 @@ def get_task(task_id: int) -> Task:
                 row = cursor.fetchone()
                 if row is None:
                     raise HTTPException(status_code=404, detail="Task not found")
-        return _row_to_task(row)
+        task = _row_to_task(row)
+        logger.info(
+            "demoboard.lifecycle action=task.get.completed task_id=%s status=%s",
+            task_id,
+            task.status,
+        )
+        return task
 
 
 @app.put("/tasks/{task_id}", response_model=Task)
@@ -238,6 +274,7 @@ def update_task(task_id: int, payload: TaskUpdate) -> Task:
     set_clause = ", ".join(fields)
     with tracer.start_as_current_span("tasks.update") as span:
         span.set_attribute("task.id", task_id)
+        logger.info("demoboard.lifecycle action=task.update.started task_id=%s", task_id)
         with get_db() as conn:
             with get_cursor(conn) as cursor:
                 _ensure_task_exists(cursor, task_id)
@@ -259,18 +296,26 @@ def update_task(task_id: int, payload: TaskUpdate) -> Task:
                         (task_id,),
                     )
                     row = cursor.fetchone()
-        return _row_to_task(row)
+        task = _row_to_task(row)
+        logger.info(
+            "demoboard.lifecycle action=task.update.completed task_id=%s status=%s",
+            task_id,
+            task.status,
+        )
+        return task
 
 
 @app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int) -> None:
     with tracer.start_as_current_span("tasks.delete") as span:
         span.set_attribute("task.id", task_id)
+        logger.info("demoboard.lifecycle action=task.delete.started task_id=%s", task_id)
         with get_db() as conn:
             with get_cursor(conn) as cursor:
                 cursor.execute(format_sql("DELETE FROM tasks WHERE id=%s"), (task_id,))
                 if cursor.rowcount == 0:
                     raise HTTPException(status_code=404, detail="Task not found")
+        logger.info("demoboard.lifecycle action=task.delete.completed task_id=%s", task_id)
 
 
 @app.post("/tasks/{task_id}/start-job")
@@ -282,13 +327,24 @@ def start_job(task_id: int) -> dict:
         )
     with tracer.start_as_current_span("tasks.start_job") as span:
         span.set_attribute("task.id", task_id)
+        logger.info("demoboard.lifecycle action=task.process.started task_id=%s", task_id)
+        logger.info(
+            "demoboard.lifecycle action=task.process.database_status_update.started task_id=%s status=processing",
+            task_id,
+        )
         with get_db() as conn:
             with get_cursor(conn) as cursor:
                 _ensure_task_exists(cursor, task_id)
                 cursor.execute(
                     format_sql("UPDATE tasks SET status='processing' WHERE id=%s"), (task_id,)
                 )
+        logger.info(
+            "demoboard.lifecycle action=task.process.database_status_update.completed task_id=%s status=processing",
+            task_id,
+        )
+        logger.info("demoboard.lifecycle action=task.process.queue_publish.started task_id=%s", task_id)
         publish_job({"task_id": task_id})
         job_start_counter.add(1, {"queue.name": "jobs"})
-        logger.info("Job enqueued")
+        logger.info("demoboard.lifecycle action=task.process.queue_publish.completed task_id=%s", task_id)
+        logger.info("demoboard.lifecycle action=task.process.completed task_id=%s", task_id)
         return {"message": "Job started", "task_id": task_id}

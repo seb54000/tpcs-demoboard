@@ -97,6 +97,7 @@ Le dépôt est prêt pour un stack OTEL externe :
 - **Frontend** : logs JSON Nginx collectables dans la même chaîne de logs. Pour des traces navigateur OTEL, il faudra ajouter une instrumentation web dédiée côté Vue.
 - **PostgreSQL / Redis** : on **ne modifie pas** les images officielles ; on collecte leurs métriques via des exporters dédiés (`postgres-exporter`, `redis-exporter`) dans le dépôt monitoring.
 - **Logs applicatifs** : écrits sur stdout et dans `./observability-logs/` pour être collectés par Fluent Bit ou un autre agent.
+- **Cinématique des tâches** : les logs applicatifs utilisent le préfixe `demoboard.lifecycle` et des événements `started` / `completed` pour suivre la création, la mise en traitement, la file Redis, le worker et l’écriture du statut final. Chaque ligne contient le `trace_id` et le `span_id` du span actif lorsqu’une trace est disponible ; cherchez ce préfixe ou le `trace_id` dans Loki pour parcourir le traitement.
 
 En Docker Compose, la configuration par défaut cible un collector OTLP sur `http://host.docker.internal:4318`. Si le stack monitoring n'est pas lancé, mettez `OTEL_ENABLED=false`.
 Le worker simule par défaut un traitement aléatoire entre `1.5` et `2.7` secondes, ce qui peut être ajusté via `WORKER_PROCESSING_TIME_MIN_SECONDS` et `WORKER_PROCESSING_TIME_MAX_SECONDS`, ou forcé via `WORKER_PROCESSING_TIME`.

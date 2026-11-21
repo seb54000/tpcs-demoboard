@@ -136,21 +136,46 @@ def main() -> None:
             span.set_attribute("node.name", NODE_NAME or "unknown")
             span.set_attribute("node.zone", NODE_ZONE or "unknown")
             span.set_attribute("node.degraded", _is_degraded_node())
-            logger.info("Processing task %s for %.3f seconds", task_id, processing_time)
+            logger.info(
+                "demoboard.lifecycle action=worker.job.received task_id=%s queue=%s",
+                task_id,
+                QUEUE_NAME,
+            )
+            logger.info(
+                "demoboard.lifecycle action=worker.processing.started task_id=%s duration_seconds=%.3f",
+                task_id,
+                processing_time,
+            )
             retry_logs = _simulate_processing(processing_time, task_id)
             if retry_logs:
                 span.set_attribute("worker.retry_logs", retry_logs)
+            logger.info(
+                "demoboard.lifecycle action=worker.processing.completed task_id=%s retries=%s",
+                task_id,
+                retry_logs,
+            )
 
             with tracer.start_as_current_span("worker.complete_task") as db_span:
                 db_span.set_attribute("task.id", task_id)
+                logger.info(
+                    "demoboard.lifecycle action=task.complete.database_status_update.started task_id=%s status=completed",
+                    task_id,
+                )
                 with get_db() as conn:
                     with conn.cursor() as cursor:
                         cursor.execute("UPDATE tasks SET status='completed' WHERE id=%s", (task_id,))
+                        updated_rows = cursor.rowcount
+                db_span.set_attribute("db.rows_affected", updated_rows)
+                logger.info(
+                    "demoboard.lifecycle action=task.complete.database_status_update.completed task_id=%s status=completed rows=%s",
+                    task_id,
+                    updated_rows,
+                )
 
             duration_ms = (time.perf_counter() - start) * 1000
             job_counter.add(1, {"queue.name": QUEUE_NAME})
             job_duration.record(duration_ms, {"queue.name": QUEUE_NAME})
-            logger.info("Task %s completed", task_id)
+            logger.info("demoboard.lifecycle action=worker.job.completed task_id=%s", task_id)
 
 
 if __name__ == "__main__":

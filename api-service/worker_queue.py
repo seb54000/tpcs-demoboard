@@ -5,7 +5,7 @@ from typing import Any, Dict
 import redis
 from opentelemetry.propagate import inject
 
-from telemetry import tracer
+from telemetry import logger, tracer
 
 
 def _parse_port(value: str | None, default: int) -> int:
@@ -39,4 +39,15 @@ def publish_job(payload: Dict[str, Any]) -> None:
     with tracer.start_as_current_span("redis.publish_job") as span:
         span.set_attribute("messaging.system", "redis")
         span.set_attribute("messaging.destination.name", QUEUE_NAME)
+        task_id = message.get("task_id", "unknown")
+        logger.info(
+            "demoboard.lifecycle action=queue.publish.started task_id=%s queue=%s",
+            task_id,
+            QUEUE_NAME,
+        )
         client.rpush(QUEUE_NAME, json.dumps(message))
+        logger.info(
+            "demoboard.lifecycle action=queue.publish.completed task_id=%s queue=%s",
+            task_id,
+            QUEUE_NAME,
+        )
